@@ -17,6 +17,14 @@ def adjust_learning_rate(optimizer, epoch, args):
             2: 5e-5, 4: 1e-5, 6: 5e-6, 8: 1e-6,
             10: 5e-7, 15: 1e-7, 20: 5e-8
         }
+    elif args.lradj == 'type3':
+        lr_adjust = {epoch: args.learning_rate * (0.8 ** ((epoch - 1) // 1))}
+
+        # lr_adjust = {
+        #     3: 5e-4, 6: 1e-4, 8: 5e-5,
+        #     10: 1e-5, 15: 5e-6, 20: 1e-6
+        # }
+
     if epoch in lr_adjust.keys():
         lr = lr_adjust[epoch]
         for param_group in optimizer.param_groups:
@@ -113,3 +121,35 @@ def adjustment(gt, pred):
 
 def cal_accuracy(y_pred, y_true):
     return np.mean(y_pred == y_true)
+
+def plot_loss_curve(train_loss, val_loss, test_loss, save_path):
+    """
+    Plot the loss curve
+    """
+    plt.figure(figsize=(10, 5))
+    plt.plot(train_loss, label='Train Loss', color='blue')
+    plt.plot(val_loss, label='Validation Loss', color='orange')
+    plt.plot(test_loss, label='Test Loss', color='seagreen')
+    plt.title('Loss Curve')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid()
+    plt.savefig(save_path)
+    plt.close()
+
+def plot_target_vs_pred(pred, true, save_path=None):
+    assert pred.shape == true.shape, "Prediction and target shapes do not match"
+
+    plt.figure(figsize=(10, 300))
+    
+    num_samples, num_pred, num_nodes = pred.shape
+
+    for k in range(num_nodes):
+        plt.subplot(num_nodes, 1, k + 1)
+        for j in range(num_samples):
+            plt.plot(range(1 + j, num_pred + 1 + j), pred[j,:,k], c='b', label='Prediction')  
+            plt.plot(range(1 + j, num_pred + 1 + j), true[j,:,k], c='r', label='Target') 
+
+    plt.title('Test prediction vs Target')
+    plt.savefig(save_path)

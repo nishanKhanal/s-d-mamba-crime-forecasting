@@ -4,6 +4,8 @@ from data_provider.data_factory import data_provider
 from experiments.exp_basic import Exp_Basic
 from utils.tools import EarlyStopping, adjust_learning_rate, visual
 from utils.metrics import metric
+from utils.tools import plot_loss_curve
+from utils.tools import plot_target_vs_pred
 import torch
 import torch.nn as nn
 from torch import optim
@@ -102,6 +104,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         if self.args.use_amp:
             scaler = torch.cuda.amp.GradScaler()
 
+        train_losses, vali_losses, test_losses = [], [], []
         for epoch in range(self.args.train_epochs):
             iter_count = 0
             train_loss = []
@@ -177,6 +180,10 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             vali_loss = self.vali(vali_data, vali_loader, criterion)
             test_loss = self.vali(test_data, test_loader, criterion)
 
+            train_losses.append(train_loss)
+            vali_losses.append(vali_loss)
+            test_losses.append(test_loss)
+
             print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
                 epoch + 1, train_steps, train_loss, vali_loss, test_loss))
             early_stopping(vali_loss, self.model, path)
@@ -191,6 +198,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         best_model_path = path + '/' + 'checkpoint.pth'
         self.model.load_state_dict(torch.load(best_model_path))
 
+        loss_curve_path = path + '/' + 'loss_curve.png'
+        plot_loss_curve(train_losses, vali_losses, test_losses, loss_curve_path)
         return self.model
 
     def test(self, setting, test=0):
@@ -294,6 +303,15 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe]))
         np.save(folder_path + 'pred.npy', preds)
         np.save(folder_path + 'true.npy', trues)
+
+        if test_data.scale:
+            np.save(folder_path + 'mean.npy', test_data.scaler.mean_)
+            np.save(folder_path + 'std.npy', test_data.scaler.scale_)
+
+        print("self.args.data:", self.args.data)
+        if 'crime' in self.args.data:
+            print("plotting graphs")
+            plot_target_vs_pred(preds, trues, folder_path + 'target_v_pred_test.png')
 
         return
     def get_input(self, setting):
