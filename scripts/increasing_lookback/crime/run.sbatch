@@ -22,11 +22,17 @@ source ~/.bashrc
 conda activate $smamba_env
 
 # python run.py
-bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/Informer_M.sh
-bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/Informer.sh
-bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/iTransformer.sh
-bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/Reformer_M.sh
-bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/Reformer.sh
-bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/S_Mamba.sh
-bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/Transformer_M.sh
-bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/Transformer.sh
+bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/iInformer.sh
+bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/iReformer.sh
+bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/iFlashformer.sh
+bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/iFlowformer.sh
+bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/Flashformer.sh
+bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/Flowformer.sh
+# bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/Informer_M.sh
+# bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/Informer.sh
+# bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/iTransformer.sh
+# bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/Reformer_M.sh
+# bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/Reformer.sh
+# bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/S_Mamba.sh
+# bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/Transformer_M.sh
+# bash /mnt/home/khanalni/shield-project/extra/S-D-Mamba/scripts/increasing_lookback/crime/Transformer.sh
