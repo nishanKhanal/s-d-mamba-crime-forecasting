@@ -88,6 +88,10 @@ if __name__ == '__main__':
                                                                            'you can select [partial_start_index, min(enc_in + partial_start_index, N)]')
     parser.add_argument('--d_state', type=int, default=32, help='parameter of Mamba Block')
 
+    # GCN
+    parser.add_argument('--gcn_out_channels', type=int, default=8, help='number of out channels for gcn layer')
+    parser.add_argument('--k', type=int, default=5, help='value of k for knn calculation before gcn')
+
     args = parser.parse_args()
     args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
 

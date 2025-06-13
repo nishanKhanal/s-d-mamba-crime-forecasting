@@ -6,6 +6,8 @@ from utils.tools import EarlyStopping, adjust_learning_rate, visual
 from utils.metrics import metric
 from utils.tools import plot_loss_curve
 from utils.tools import plot_target_vs_pred
+from utils.tools import get_edge_indices
+from pathlib import Path
 import torch
 import torch.nn as nn
 from torch import optim
@@ -13,6 +15,9 @@ import os
 import time
 import warnings
 import numpy as np
+
+torch.autograd.set_detect_anomaly(True)
+
 
 warnings.filterwarnings('ignore')
 
@@ -22,7 +27,14 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         super(Exp_Long_Term_Forecast, self).__init__(args)
 
     def _build_model(self):
-        model = self.model_dict[self.args.model].Model(self.args).float()
+
+        # if self.args.use_GCN:
+        if self.args.model == "GCN_SMamba":
+            file_path = Path('.').resolve() / "dataset" / "crime" / "geo" / "chicago_community_centroid.csv"
+            edge_index = get_edge_indices(file_path, self.args.k).to(self.device)
+            model = self.model_dict[self.args.model].Model(gcn_out_channels=self.args.gcn_out_channels, edge_index=edge_index, mamba_args = self.args).float()
+        else:
+            model = self.model_dict[self.args.model].Model(self.args).float()
 
         if self.args.use_multi_gpu and self.args.use_gpu:
             model = nn.DataParallel(model, device_ids=self.args.device_ids)

@@ -5,6 +5,9 @@ import torch
 import matplotlib.pyplot as plt
 import pandas as pd
 
+# from torch_geometric.nn import knn_graph
+from torch_cluster import knn_graph
+
 plt.switch_backend('agg')
 
 
@@ -153,3 +156,15 @@ def plot_target_vs_pred(pred, true, save_path=None):
 
     plt.title('Test prediction vs Target')
     plt.savefig(save_path)
+
+def get_edge_indices(comm_centroid_file_path, k=5):
+    df = pd.read_csv(comm_centroid_file_path)
+    df.sort_values('area_id', inplace=True)
+
+    features = ['centroid_x', 'centroid_y'] # except the area_id
+    x = df[features].to_numpy() 
+    x = torch.tensor(x, dtype=torch.float)
+
+    # Get edge_index (2, num_edges)
+    edge_index = knn_graph(x, k=k, loop=True)
+    return edge_index
