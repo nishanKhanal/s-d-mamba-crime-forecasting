@@ -91,6 +91,14 @@ if __name__ == '__main__':
     # GCN
     parser.add_argument('--gcn_out_channels', type=int, default=8, help='number of out channels for gcn layer')
     parser.add_argument('--k', type=int, default=5, help='value of k for knn calculation before gcn')
+    
+    # For synthetic dataset
+    parser.add_argument('--num_nodes', type=int, default=77, help='number of nodes for sythetic dataset')
+    parser.add_argument('--num_time_steps', type=int, default=1253, help='number of time steps for sythetic dataset')
+    parser.add_argument('--mode', type=str, default="temporal", help='mode for sythetic dataset')
+    parser.add_argument('--w', type=float, default=2.0, help='frequency for sinewave for synthetic dataset')
+    parser.add_argument('--dt', type=float, default= np.pi / 45, help='time_increment for synthetic dataset')
+    parser.add_argument('--noise_strength', type=float, default= 0.2 , help='time_increment for synthetic dataset')
 
     args = parser.parse_args()
     args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False

@@ -16,7 +16,7 @@ import time
 import warnings
 import numpy as np
 
-torch.autograd.set_detect_anomaly(True)
+# torch.autograd.set_detect_anomaly(True)
 
 
 warnings.filterwarnings('ignore')
@@ -30,8 +30,14 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         # if self.args.use_GCN:
         if self.args.model == "GCN_SMamba":
-            file_path = Path('.').resolve() / "dataset" / "crime" / "geo" / "chicago_community_centroid.csv"
-            edge_index = get_edge_indices(file_path, self.args.k).to(self.device)
+            if "crime" in self.args.data:
+                file_path = Path('.').resolve() / "dataset" / "crime" / "geo" / "chicago_community_centroid.csv"
+                edge_index = get_edge_indices(file_path, self.args.k).to(self.device)
+            else: # if sythetic data
+                adj = np.eye(self.args.num_nodes, k=-1)
+                adj[0,0] = 1
+                edge_index = torch.tensor(np.nonzero(adj)).to(self.device)
+                print(edge_index.shape)
             model = self.model_dict[self.args.model].Model(gcn_out_channels=self.args.gcn_out_channels, edge_index=edge_index, mamba_args = self.args).float()
         else:
             model = self.model_dict[self.args.model].Model(self.args).float()
@@ -321,7 +327,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             np.save(folder_path + 'std.npy', test_data.scaler.scale_)
 
         print("self.args.data:", self.args.data)
-        if 'crime' in self.args.data:
+        if 'crime' or 'synthetic' in self.args.data:
             print("plotting graphs")
             plot_target_vs_pred(preds, trues, folder_path + 'target_v_pred_test.png')
 

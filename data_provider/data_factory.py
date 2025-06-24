@@ -1,5 +1,5 @@
 from data_provider.data_loader import Dataset_ETT_hour, Dataset_ETT_minute, Dataset_Custom, Dataset_Solar, Dataset_PEMS, \
-    Dataset_Pred, Dataset_Crime
+    Dataset_Pred, Dataset_Crime, Dataset_Synthetic
 from torch.utils.data import DataLoader
 
 data_dict = {
@@ -11,6 +11,7 @@ data_dict = {
     'PEMS': Dataset_PEMS,
     'custom': Dataset_Custom,
     'crime': Dataset_Crime,
+    'synthetic': Dataset_Synthetic,
 }
 
 
@@ -35,16 +36,28 @@ def data_provider(args, flag):
         batch_size = args.batch_size  # bsz for train and valid
         freq = args.freq
 
-    data_set = Data(
-        root_path=args.root_path,
-        data_path=args.data_path,
-        flag=flag,
-        size=[args.seq_len, args.label_len, args.pred_len],
-        features=args.features,
-        target=args.target,
-        timeenc=timeenc,
-        freq=freq,
-    )
+    kwargs = {
+        "root_path" : args.root_path,
+        "data_path" : args.data_path,
+        "flag" : flag,
+        "size" : [args.seq_len, args.label_len, args.pred_len],
+        "features" : args.features,
+        "target" : args.target,
+        "timeenc" : timeenc,
+        "freq" : freq,
+    }
+
+    if args.data == 'synthetic':
+        kwargs['syn_data_params'] = {
+            'N': args.num_nodes,
+            'T': args.num_time_steps,
+            'mode': args.mode,
+            'w': args.w,
+            'dt': args.dt,
+            'noise_strength': args.noise_strength,
+        }
+    data_set = Data(**kwargs)
+    
     print(flag, len(data_set))
     data_loader = DataLoader(
         data_set,

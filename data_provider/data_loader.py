@@ -655,3 +655,196 @@ class Dataset_Crime(Dataset):
 
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)
+
+
+class Dataset_Synthetic(Dataset):
+    def __init__(self, root_path=None, data_path= None, flag='train', 
+                size=None, features='M', syn_data_params={}, 
+                scale=True, timeenc=1, freq='w', target=None):
+        # Sequence lengths
+        if size is None:
+            self.seq_len = 24
+            self.label_len = 12
+            self.pred_len = 4
+        else:
+            self.seq_len, self.label_len, self.pred_len = size
+
+        assert flag in ['train', 'val', 'test']
+        type_map = {'train': 0, 'val': 1, 'test': 2}
+        self.set_type = type_map[flag]
+
+        self.features = features
+        self.scale = scale
+        self.timeenc = timeenc
+        self.freq = freq
+        self.syn_data_params = syn_data_params
+
+        # --- Generate synthetic data ---
+        self.N = syn_data_params.get('N', 77)
+        self.T = syn_data_params.get('T', 1253)
+        self.mode = syn_data_params.get('mode', 'none')
+
+        self.__read_data__()
+
+    def __read_data__(self):
+        # Generate synthetic data: shape [N, T]
+        Y = self.generate_dataset(
+            N=self.N,
+            T=self.T,
+            mode=self.mode,
+            w=self.syn_data_params.get('w', 1.0),
+            noise_strength=self.syn_data_params.get('noise_strength', 0.1),
+            dt=self.syn_data_params.get('dt', np.pi/45)
+        )  # [N, T]
+
+        data = Y.T # [T, N]
+
+        # Prepare as DataFrame for feature compatibility
+        node_cols = [f"node_{i}" for i in range(self.N)]
+        df_raw = pd.DataFrame(data, columns=node_cols)
+        self.target = node_cols[0]  # Use first node as target for 'S' mode
+
+        # Train/val/test splits
+        num_train = int(len(df_raw) * 0.7)
+        num_test = int(len(df_raw) * 0.2)
+        num_vali = len(df_raw) - num_train - num_test
+        border1s = [0, num_train - self.seq_len, len(df_raw) - num_test - self.seq_len]
+        border2s = [num_train, num_train + num_vali, len(df_raw)]
+        border1 = border1s[self.set_type]
+        border2 = border2s[self.set_type]
+
+        if self.features == 'M':
+            df_data = df_raw
+        elif self.features == 'S':
+            df_data = df_raw[[self.target]]
+
+        # Scaling
+        self.scaler = StandardScaler()
+        if self.scale:
+            train_data = df_data.iloc[border1s[0]:border2s[0]]
+            self.scaler.fit(train_data.values)
+            data_scaled = self.scaler.transform(df_data.values)
+        else:
+            data_scaled = df_data.values
+
+        # --- TIME FEATURES ---
+        if self.timeenc == 0:
+            # Option 1: Calendar features
+            dates = pd.date_range(start='2000-01-01', periods=len(df_raw), freq=self.freq)
+            df_stamp = pd.DataFrame({'date': dates})
+            df_stamp['month'] = df_stamp.date.dt.month
+            df_stamp['day'] = df_stamp.date.dt.day
+            df_stamp['weekday'] = df_stamp.date.dt.weekday
+            df_stamp['hour'] = df_stamp.date.dt.hour if self.freq[0] == 'H' else 0
+            data_stamp = df_stamp[['month', 'day', 'weekday', 'hour']].values
+        elif self.timeenc == 1:
+            dates = pd.date_range(start='2001-01-01', periods=len(df_raw), freq='7D')
+
+            data_stamp = time_features(pd.to_datetime(dates.values), freq=self.freq)
+            data_stamp = data_stamp.transpose(1, 0)
+
+        else:
+            # Option 2: Cyclical features
+            t = np.arange(len(df_raw))
+            sin1 = np.sin(2 * np.pi * t / 24)
+            cos1 = np.cos(2 * np.pi * t / 24)
+            sin2 = np.sin(2 * np.pi * t / 7)
+            cos2 = np.cos(2 * np.pi * t / 7)
+            data_stamp = np.stack([sin1, cos1, sin2, cos2], axis=1)  # [T, 4]
+
+        self.data_x = data_scaled[border1:border2]
+        self.data_y = data_scaled[border1:border2] 
+        self.data_stamp = data_stamp[border1:border2]
+
+
+    def __getitem__(self, index):
+        s_begin = index
+        s_end = s_begin + self.seq_len
+        r_begin = s_end - self.label_len
+        r_end = r_begin + self.label_len + self.pred_len
+
+        seq_x = self.data_x[s_begin:s_end]
+        seq_y = self.data_y[r_begin:r_end]
+        seq_x_mark = self.data_stamp[s_begin:s_end]
+        seq_y_mark = self.data_stamp[r_begin:r_end]
+
+        return seq_x, seq_y, seq_x_mark, seq_y_mark
+
+    def __len__(self):
+        return len(self.data_x) - self.seq_len - self.pred_len + 1
+
+    def generate_dataset(self, 
+        N=77,                # Number of nodes
+        T=200,               # Number of time steps
+        mode="temporal",        # "none", "temporal", "spatial", "spatio-temporal"
+        w=1.0,              # Frequency for sin
+        noise_strength=0.1,      # Standard deviation of additive noise
+        dt= np.pi / 45,      # time increment
+        ):
+        """
+        Generate synthetic spatio-temporal data using f(a, b, t) = a * sin(w * t) + b.
+        Modes:
+            - "none": a, b, t all random
+            - "temporal": a, b random per node; t evolves over time
+            - "spatial": a, b spatially correlated; t random
+            - "spatio-temporal": a, b and t all evolve, using simple AR(1) and spatial neighbor mean
+        """
+        Y = np.zeros((N, T))
+
+        if mode == "none":
+            for i in range(N):
+                for t in range(T):
+                    a = np.random.uniform(-1, 1)
+                    b = np.random.uniform(-1.0, 1.0)
+                    t_rand = np.random.uniform(0, 2 * np.pi)
+                    Y[i, t] = a * np.sin(w * t_rand) + b + np.random.randn() * noise_strength
+
+        elif mode == "temporal":
+            a = np.random.uniform(-1, 1, size=N)
+            b = np.random.uniform(-1.0, 1.0, size=N)
+            t0 = np.random.uniform(0, 2 * np.pi, size=N)
+            for i in range(N):
+                for t in range(T):
+                    t_curr = t0[i] + dt * t
+                    Y[i, t] = a[i] * np.sin(w * t_curr) + b[i] + np.random.randn() * noise_strength
+
+        elif mode == "spatial":
+            t_rand = np.random.uniform(0, 2 * np.pi, T)
+            a = np.zeros(N)
+            b = np.zeros(N)
+            # Node 0 random, others depend on previous
+            a[0] = np.random.uniform(-1, 1)
+            b[0] = np.random.uniform(-1.0, 1.0)
+            for i in range(1, N):
+                a[i] = 0.8 * a[i-1] + 0.2 * np.random.uniform(-1, 1)
+                b[i] = 0.8 * b[i-1] + 0.2 * np.random.uniform(-1.0, 1.0)
+            for i in range(N):
+                for t in range(T):
+                    Y[i, t] = a[i] * np.sin(w * t_rand[t]) + b[i] + np.random.randn() * noise_strength
+
+        elif mode == "spatio-temporal":
+            a = np.zeros((N, T))
+            b = np.zeros((N, T))
+            t_seq = np.zeros((N, T))
+            # Start from random for all
+            a[:, 0] =  np.random.uniform(-1,1, (N))
+            b[:, 0] =  np.random.uniform(-1,1, (N))
+            t_seq[:, 0] = np.random.uniform(0, 2* np.pi, (N))
+            for t in range(1, T):
+                for i in range(N):
+                    # For spatial effect, use previous node if exists, else just self
+                    neighbor_a = a[i-1, t-1] if i > 0 else a[i, t-1]
+                    neighbor_b = b[i-1, t-1] if i > 0 else b[i, t-1]
+                    a[i, t] = 0.45 * a[i, t-1] + 0.45 * neighbor_a + 0.1 * np.random.uniform(-1, 1)
+                    b[i, t] = 0.45 * b[i, t-1] + 0.45 * neighbor_b + 0.1 * np.random.uniform(-1.0, 1.0)
+                    t_seq[i, t] = t_seq[i, t-1] + dt + np.random.randn() * 0.01
+            for i in range(N):
+                for t in range(T):
+                    Y[i, t] = a[i, t] * np.sin(w * t_seq[i, t]) + b[i, t] + np.random.randn() * noise_strength
+        else:
+            raise ValueError("mode must be 'none', 'temporal', 'spatial', or 'spatio-temporal'")
+
+        return Y
+
+    def inverse_transform(self, data):
+        return self.scaler.inverse_transform(data)
