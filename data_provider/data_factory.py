@@ -1,5 +1,5 @@
 from data_provider.data_loader import Dataset_ETT_hour, Dataset_ETT_minute, Dataset_Custom, Dataset_Solar, Dataset_PEMS, \
-    Dataset_Pred, Dataset_Crime, Dataset_Synthetic
+    Dataset_Pred, Dataset_Crime, Dataset_Synthetic, Dataset_Synthetic_Through_Rotation
 from torch.utils.data import DataLoader
 
 data_dict = {
@@ -12,6 +12,7 @@ data_dict = {
     'custom': Dataset_Custom,
     'crime': Dataset_Crime,
     'synthetic': Dataset_Synthetic,
+    'synthetic_rotate': Dataset_Synthetic_Through_Rotation,
 }
 
 
@@ -47,7 +48,7 @@ def data_provider(args, flag):
         "freq" : freq,
     }
 
-    if args.data == 'synthetic':
+    if 'synthetic' in args.data:
         kwargs['syn_data_params'] = {
             'N': args.num_nodes,
             'T': args.num_time_steps,
@@ -55,6 +56,8 @@ def data_provider(args, flag):
             'w': args.w,
             'dt': args.dt,
             'noise_strength': args.noise_strength,
+            'theta_deg': args.theta_deg,
+            'pad_mode': args.pad_mode,
         }
     data_set = Data(**kwargs)
     

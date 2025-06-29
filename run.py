@@ -98,7 +98,12 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str, default="temporal", help='mode for sythetic dataset')
     parser.add_argument('--w', type=float, default=2.0, help='frequency for sinewave for synthetic dataset')
     parser.add_argument('--dt', type=float, default= np.pi / 45, help='time_increment for synthetic dataset')
-    parser.add_argument('--noise_strength', type=float, default= 0.2 , help='time_increment for synthetic dataset')
+    parser.add_argument('--noise_strength', type=float, default= 0.1 , help='time_increment for synthetic dataset')
+
+    # Only for synthetic_rotation dataset
+    parser.add_argument('--pad_mode', type=str, default='manual', help='paddding mode for input data')
+    parser.add_argument('--theta_deg', type=float, default=0, help='degree of rotation for synthetic dataset')
+
 
     args = parser.parse_args()
     args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
@@ -123,25 +128,34 @@ if __name__ == '__main__':
     if args.is_training==1:
         for ii in range(args.itr):
             # setting record of experiments
-            setting = '{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
-                args.model_id,
-                args.model,
-                args.data,
-                args.features,
-                args.seq_len,
-                args.label_len,
-                args.pred_len,
-                args.d_model,
-                args.n_heads,
-                args.e_layers,
-                args.d_layers,
-                args.d_ff,
-                args.factor,
-                args.embed,
-                args.distil,
-                args.des,
-                args.class_strategy, ii)
 
+            if args.data == 'synthetic_rotate':
+                model_id = args.model_id + '_pm-{}-deg-{}-ns-{}'.format(
+                    args.pad_mode[:3],
+                    args.theta_deg,
+                    args.noise_strength)
+            else:
+                model_id = args.model_id
+                
+            setting = '{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
+            model_id,
+            args.model,
+            args.data,
+            args.features,
+            args.seq_len,
+            args.label_len,
+            args.pred_len,
+            args.d_model,
+            args.n_heads,
+            args.e_layers,
+            args.d_layers,
+            args.d_ff,
+            args.factor,
+            args.embed,
+            args.distil,
+            args.des,
+            args.class_strategy, ii)
+          
             exp = Exp(args)  # set experiments
             print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
             exp.train(setting)
