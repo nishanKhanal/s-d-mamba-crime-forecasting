@@ -168,3 +168,25 @@ def get_edge_indices(comm_centroid_file_path, k=5):
     # Get edge_index (2, num_edges)
     edge_index = knn_graph(x, k=k, loop=True)
     return edge_index
+
+def grid_adjacency(X, Y, include_self=True):
+    N = X * Y
+    adj = np.zeros((N, N), dtype=int)
+    # Directions for 8-connectivity: (dx, dy)
+    dirs = [(-1, -1), (-1, 0), (-1, 1),
+            (0, -1),           (0, 1),
+            (1, -1),  (1, 0),  (1, 1)]
+    for x in range(X):
+        for y in range(Y):
+            idx = x * Y + y
+            neighbors = []
+            if include_self:
+                neighbors.append((x, y))
+            for dx, dy in dirs:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < X and 0 <= ny < Y:
+                    neighbors.append((nx, ny))
+            for nx, ny in neighbors:
+                n_idx = nx * Y + ny
+                adj[idx, n_idx] = 1
+    return adj

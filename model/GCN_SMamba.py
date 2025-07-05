@@ -76,5 +76,7 @@ class Model(nn.Module):
         # Project back to [B, T, enc_in] to match Mamba input
         x_projected = self.flatten_gcn_output(x_combined)
 
+        # x_projected = gcn_output.squeeze(-1)
+
         # Call original Mamba
         return self.mamba_model(x_projected, x_mark_enc, x_dec, x_mark_dec)

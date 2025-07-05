@@ -1,5 +1,5 @@
 from data_provider.data_loader import Dataset_ETT_hour, Dataset_ETT_minute, Dataset_Custom, Dataset_Solar, Dataset_PEMS, \
-    Dataset_Pred, Dataset_Crime, Dataset_Synthetic, Dataset_Synthetic_Through_Rotation
+    Dataset_Pred, Dataset_Crime, Dataset_Synthetic, Dataset_Synthetic_Through_Rotation, Dataset_Synthetic_2D
 from torch.utils.data import DataLoader
 
 data_dict = {
@@ -13,6 +13,7 @@ data_dict = {
     'crime': Dataset_Crime,
     'synthetic': Dataset_Synthetic,
     'synthetic_rotate': Dataset_Synthetic_Through_Rotation,
+    'synthetic_2d': Dataset_Synthetic_2D,
 }
 
 
@@ -50,7 +51,7 @@ def data_provider(args, flag):
 
     if 'synthetic' in args.data:
         kwargs['syn_data_params'] = {
-            'N': args.num_nodes,
+            'N': args.height * args.width if args.data == 'synthetic_2d' else args.num_nodes,
             'T': args.num_time_steps,
             'mode': args.mode,
             'w': args.w,
@@ -58,6 +59,12 @@ def data_provider(args, flag):
             'noise_strength': args.noise_strength,
             'theta_deg': args.theta_deg,
             'pad_mode': args.pad_mode,
+            
+            # for synthetic_2d
+            'H': args.height,
+            'W': args.width,
+            'alpha': args.alpha,
+            'noise_std': args.noise_std
         }
     data_set = Data(**kwargs)
     

@@ -7,6 +7,7 @@ from utils.metrics import metric
 from utils.tools import plot_loss_curve
 from utils.tools import plot_target_vs_pred
 from utils.tools import get_edge_indices
+from utils.tools import grid_adjacency
 from pathlib import Path
 import torch
 import torch.nn as nn
@@ -33,11 +34,15 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             if "crime" in self.args.data:
                 file_path = Path('.').resolve() / "dataset" / "crime" / "geo" / "chicago_community_centroid.csv"
                 edge_index = get_edge_indices(file_path, self.args.k).to(self.device)
-            else: # if sythetic data
+            elif self.args.data == 'synthetic' or self.args.data == 'synthetic_rotate': # if sythetic data
                 adj = np.eye(self.args.num_nodes, k=-1)
                 adj[0,0] = 1
                 edge_index = torch.tensor(np.nonzero(adj)).to(self.device)
                 print(edge_index.shape)
+            elif self.args.data == 'synthetic_2d':
+                adj = grid_adjacency(self.args.height, self.args.width, include_self=True)
+                edge_index = torch.tensor(np.nonzero(adj)).to(self.device)
+                
             model = self.model_dict[self.args.model].Model(gcn_out_channels=self.args.gcn_out_channels, edge_index=edge_index, mamba_args = self.args).float()
         else:
             model = self.model_dict[self.args.model].Model(self.args).float()

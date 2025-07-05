@@ -8,6 +8,7 @@ from utils.timefeatures import time_features
 import warnings
 
 import torchvision.transforms.functional as TF
+import gstools as gs
 
 warnings.filterwarnings('ignore')
 
@@ -1024,6 +1025,170 @@ class Dataset_Synthetic_Through_Rotation(Dataset):
         result = self.crop_center(rotated_np, N, T)
 
         return result, original
+
+    def inverse_transform(self, data):
+        return self.scaler.inverse_transform(data)
+
+class Dataset_Synthetic_2D(Dataset):
+    def __init__(self, root_path=None, data_path= None, flag='train', 
+                size=None, features='M', syn_data_params={}, 
+                scale=True, timeenc=1, freq='w', target=None):
+        # Sequence lengths
+        if size is None:
+            self.seq_len = 24
+            self.label_len = 12
+            self.pred_len = 4
+        else:
+            self.seq_len, self.label_len, self.pred_len = size
+
+        assert flag in ['train', 'val', 'test']
+        type_map = {'train': 0, 'val': 1, 'test': 2}
+        self.set_type = type_map[flag]
+
+        self.features = features
+        self.scale = scale
+        self.timeenc = timeenc
+        self.freq = freq
+        self.syn_data_params = syn_data_params
+
+        self.H = syn_data_params.get('H', 10)
+        self.W = syn_data_params.get('W', 10)
+        self.N = self.H * self.W # Total number of nodes
+
+        self.T = syn_data_params.get('T', 1253)
+        self.alpha = syn_data_params.get('alpha', 0)  # Mixing factor
+
+        self.__read_data__()
+
+    def __read_data__(self):
+
+        data = self.generate_spatiotemporal_data(
+            self.alpha, 
+            space_dim=(self.H, self.W),
+            time_dim=self.T,
+            noise_std=self.syn_data_params.get('noise_std', 0.1)
+        )
+
+        print(f"Generated data shape: {data.shape}")  # Should be [T, H*W]
+        
+        # Prepare as DataFrame for feature compatibility
+        node_cols = [f"node_{i}" for i in range(self.N)]
+        df_raw = pd.DataFrame(data, columns=node_cols)
+        self.target = node_cols[0]  # Use first node as target for 'S' mode
+
+        # Train/val/test splits
+        num_train = int(len(df_raw) * 0.7)
+        num_test = int(len(df_raw) * 0.2)
+        num_vali = len(df_raw) - num_train - num_test
+        border1s = [0, num_train - self.seq_len, len(df_raw) - num_test - self.seq_len]
+        border2s = [num_train, num_train + num_vali, len(df_raw)]
+        border1 = border1s[self.set_type]
+        border2 = border2s[self.set_type]
+
+        if self.features == 'M':
+            df_data = df_raw
+        elif self.features == 'S':
+            df_data = df_raw[[self.target]]
+
+        # Scaling
+        self.scaler = StandardScaler()
+        if self.scale:
+            train_data = df_data.iloc[border1s[0]:border2s[0]]
+            self.scaler.fit(train_data.values)
+            data_scaled = self.scaler.transform(df_data.values)
+        else:
+            data_scaled = df_data.values
+
+        # --- TIME FEATURES ---
+        if self.timeenc == 0:
+            # Option 1: Calendar features
+            dates = pd.date_range(start='2000-01-01', periods=len(df_raw), freq=self.freq)
+            df_stamp = pd.DataFrame({'date': dates})
+            df_stamp['month'] = df_stamp.date.dt.month
+            df_stamp['day'] = df_stamp.date.dt.day
+            df_stamp['weekday'] = df_stamp.date.dt.weekday
+            df_stamp['hour'] = df_stamp.date.dt.hour if self.freq[0] == 'H' else 0
+            data_stamp = df_stamp[['month', 'day', 'weekday', 'hour']].values
+        elif self.timeenc == 1:
+            dates = pd.date_range(start='2001-01-01', periods=len(df_raw), freq='7D')
+
+            data_stamp = time_features(pd.to_datetime(dates.values), freq=self.freq)
+            data_stamp = data_stamp.transpose(1, 0)
+
+        else:
+            # Option 2: Cyclical features
+            t = np.arange(len(df_raw))
+            sin1 = np.sin(2 * np.pi * t / 24)
+            cos1 = np.cos(2 * np.pi * t / 24)
+            sin2 = np.sin(2 * np.pi * t / 7)
+            cos2 = np.cos(2 * np.pi * t / 7)
+            data_stamp = np.stack([sin1, cos1, sin2, cos2], axis=1)  # [T, 4]
+
+        self.data_x = data_scaled[border1:border2]
+        self.data_y = data_scaled[border1:border2] 
+        self.data_stamp = data_stamp[border1:border2]
+
+
+    def __getitem__(self, index):
+        s_begin = index
+        s_end = s_begin + self.seq_len
+        r_begin = s_end - self.label_len
+        r_end = r_begin + self.label_len + self.pred_len
+
+        seq_x = self.data_x[s_begin:s_end]
+        seq_y = self.data_y[r_begin:r_end]
+        seq_x_mark = self.data_stamp[s_begin:s_end]
+        seq_y_mark = self.data_stamp[r_begin:r_end]
+
+        return seq_x, seq_y, seq_x_mark, seq_y_mark
+
+    def __len__(self):
+        return len(self.data_x) - self.seq_len - self.pred_len + 1
+
+    def generate_spatiotemporal_data(self, alpha, space_dim=(50,50), time_dim=100, noise_std=0.1):
+        """
+        Generate synthetic spatio-temporal data.
+
+        Parameters:
+        - alpha: float [0,1], balance between spatial and temporal patterns.
+                alpha=1: spatial only, alpha=0: temporal only.
+        - space_dim: tuple, spatial grid size.
+        - time_dim: int, length of the time series.
+        - noise_std: float, standard deviation of added Gaussian noise.
+
+        Returns:
+        - data: ndarray of shape (time_dim, *space_dim)
+        """
+
+        # Spatial pattern (Gaussian Random Field)
+        model = gs.Gaussian(dim=2, var=1.0, len_scale=10)
+        srf = gs.SRF(model, seed=42)
+        x = np.linspace(0, 100, space_dim[0])
+        y = np.linspace(0, 100, space_dim[1])
+        X, Y = np.meshgrid(x, y)
+        spatial_pattern = srf.structured([x, y])
+
+        # Temporal pattern (Sinusoidal + AR(1))
+        time = np.arange(time_dim)
+        temporal_pattern = np.sin(2 * np.pi * time / time_dim) + \
+                        np.random.normal(scale=0.5, size=time_dim).cumsum()
+
+        # Normalize patterns
+        spatial_pattern = (spatial_pattern - spatial_pattern.mean()) / spatial_pattern.std()
+        temporal_pattern = (temporal_pattern - temporal_pattern.mean()) / temporal_pattern.std()
+
+        # Combine patterns
+        data = np.zeros((time_dim, space_dim[0], space_dim[1]))
+        for t in range(time_dim):
+            data[t] = alpha * spatial_pattern + (1 - alpha) * temporal_pattern[t]
+
+        # Add noise
+        data += np.random.normal(scale=noise_std, size=data.shape)
+
+        # Reshape to (time_dim, N) where N = H * W
+        data = data.reshape(time_dim, -1)
+
+        return data
 
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)

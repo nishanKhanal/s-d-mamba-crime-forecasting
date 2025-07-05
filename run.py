@@ -98,12 +98,17 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str, default="temporal", help='mode for sythetic dataset')
     parser.add_argument('--w', type=float, default=2.0, help='frequency for sinewave for synthetic dataset')
     parser.add_argument('--dt', type=float, default= np.pi / 45, help='time_increment for synthetic dataset')
-    parser.add_argument('--noise_strength', type=float, default= 0.1 , help='time_increment for synthetic dataset')
+    parser.add_argument('--noise_strength', type=float, default= 0.1 , help='noise strength')
 
     # Only for synthetic_rotation dataset
     parser.add_argument('--pad_mode', type=str, default='manual', help='paddding mode for input data')
     parser.add_argument('--theta_deg', type=float, default=0, help='degree of rotation for synthetic dataset')
 
+    # Only for synthetic_2d dataset
+    parser.add_argument('--height', type=int, default=10, help='height of synthetic 2d data')
+    parser.add_argument('--width', type=int, default=10, help='width of synthetic 2d data')
+    parser.add_argument('--alpha', type=float, default=0, help='balance between spatial and temporal patterns. alpha=1: spatial only, alpha=0: temporal only.')
+    parser.add_argument('--noise_std', type=float, default= 0.1 , help='noise standard deviation for synthetic 2d dataset')
 
     args = parser.parse_args()
     args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
@@ -134,6 +139,12 @@ if __name__ == '__main__':
                     args.pad_mode[:3],
                     args.theta_deg,
                     args.noise_strength)
+            elif args.data == 'synthetic_2d':
+                model_id = args.model_id + '_H-{}-W-{}-a-{}-ns-{}'.format(
+                    args.height,
+                    args.width,
+                    args.alpha,
+                    args.noise_std)
             else:
                 model_id = args.model_id
                 
